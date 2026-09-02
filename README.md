@@ -2,13 +2,13 @@
 
 Random stranger video / audio / text chat (OpenTalk / Omegle-style).
 
-Monorepo: Next.js frontend (`web`) + Socket.IO backend (`server`).
+Monorepo: Next.js frontend (`web`) + Socket.IO backend (`backend`).
 
 ## Structure
 
 ```
 web/      → Next.js app (Vercel)
-server/  → Node.js + Socket.IO (Railway)
+backend/ → Node.js + Socket.IO (Railway)
 ```
 
 ## Prerequisites
@@ -21,7 +21,7 @@ server/  → Node.js + Socket.IO (Railway)
 ```bash
 npm install
 cp web/.env.example web/.env.local
-cp server/.env.example server/.env
+cp backend/.env.example backend/.env
 ```
 
 ## Run locally
@@ -32,18 +32,18 @@ Terminal 1 — frontend (http://localhost:3000):
 npm run dev:web
 ```
 
-Terminal 2 — backend (http://localhost:4000):
+Terminal 2 — backend (http://localhost:5000):
 
 ```bash
-npm run dev:server
+npm run dev:backend
 ```
 
-Health check: [http://localhost:4000/health](http://localhost:4000/health)
+Health check: [http://localhost:5000/health](http://localhost:5000/health)
 
 ## Deploy
 
 - **web** → Vercel (root directory: `web`)
-- **server** → Railway (root directory: `server`; uses `railway.toml`)
+- **backend** → Railway (root directory: `backend`; uses `railway.toml`)
 
 ## Stack (planned)
 

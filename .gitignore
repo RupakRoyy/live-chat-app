@@ -18,8 +18,8 @@ node_modules/
 web/.next/
 web/out/
 
-# server build
-server/dist/
+# backend build
+backend/dist/
 
 # misc
 .DS_Store

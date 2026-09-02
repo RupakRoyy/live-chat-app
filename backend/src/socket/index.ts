@@ -1,23 +1,20 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
+import { env } from "../config/env.js";
 
-export function setupSocket(httpServer: HttpServer, clientOrigin: string) {
+export function createSocketServer(httpServer: HttpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: clientOrigin,
+      origin: env.frontendUrl,
       methods: ["GET", "POST"],
     },
   });
 
   io.on("connection", (socket) => {
-    console.log(`Client connected: ${socket.id}`);
-
-    socket.on("ping", () => {
-      socket.emit("pong");
-    });
+    console.log(`Socket connected: ${socket.id}`);
 
     socket.on("disconnect", (reason) => {
-      console.log(`Client disconnected: ${socket.id} (${reason})`);
+      console.log(`Socket disconnected: ${socket.id} (${reason})`);
     });
   });
 

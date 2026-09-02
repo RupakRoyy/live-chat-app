@@ -1,0 +1,20 @@
+{
+  "name": "live-chat-app",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "web",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=web",
+    "dev:web": "npm run dev --workspace=web",
+    "dev:server": "npm run dev --workspace=server",
+    "build": "npm run build --workspace=web",
+    "build:web": "npm run build --workspace=web",
+    "build:server": "npm run build --workspace=server",
+    "start:web": "npm run start --workspace=web",
+    "start:server": "npm run start --workspace=server",
+    "lint": "npm run lint --workspace=web"
+  }
+}

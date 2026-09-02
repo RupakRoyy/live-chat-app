@@ -1,0 +1,13 @@
+# Deploy this `server` directory to Railway.
+# Set root directory / watch path to `server` in the Railway service settings.
+# Required env: PORT (Railway sets this), CLIENT_ORIGIN
+# Optional later: UPSTASH_*, CLERK_SECRET_KEY, SUPABASE_*
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npm run start"
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

@@ -38,3 +38,10 @@ yarn-error.log*
 
 # coverage
 coverage/
+
+# Environment variables / secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

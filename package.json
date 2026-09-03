@@ -16,5 +16,8 @@
     "start:web": "npm run start --workspace=web",
     "start:backend": "npm run start --workspace=backend",
     "lint": "npm run lint --workspace=web"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^7.9.1"
   }
 }

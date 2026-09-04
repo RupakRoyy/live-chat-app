@@ -21,6 +21,9 @@ web/out/
 # backend build
 backend/dist/
 
+# local entitlement store (temporary; replace with Supabase later)
+backend/data/
+
 # misc
 .DS_Store
 *.pem

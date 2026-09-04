@@ -1,5 +1,6 @@
 /**
- * Clerk auth wiring will live here (provider / helpers).
- * Install `@clerk/nextjs` when ready and wrap the app in ClerkProvider.
+ * Clerk is wired in `src/app/layout.tsx` (`ClerkProvider`)
+ * and `src/proxy.ts` (`clerkMiddleware`).
+ * All routes stay public until auth UI is added.
  */
 export {};

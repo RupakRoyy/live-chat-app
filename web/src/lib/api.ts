@@ -7,6 +7,12 @@ export type AuthMeResponse = {
   userId: string;
 };
 
+export type ProStatusResponse = {
+  isPro: boolean;
+  trialStartedAt: string;
+  trialExpiresAt: string;
+};
+
 function backendUrl(path: string): string {
   const base = publicEnv.apiUrl.replace(/\/$/, "");
   const suffix = path.startsWith("/") ? path : `/${path}`;
@@ -48,4 +54,26 @@ export async function fetchAuthMe(): Promise<AuthMeResponse> {
   }
 
   return data;
+}
+
+export async function fetchProStatus(): Promise<ProStatusResponse> {
+  const response = await apiRequest("/pro/status");
+
+  if (!response.ok) {
+    throw new Error("Failed to load Pro status");
+  }
+
+  const data = (await response.json()) as Partial<ProStatusResponse>;
+
+  if (typeof data.isPro !== "boolean") {
+    throw new Error("Failed to load Pro status");
+  }
+
+  return {
+    isPro: data.isPro,
+    trialStartedAt:
+      typeof data.trialStartedAt === "string" ? data.trialStartedAt : "",
+    trialExpiresAt:
+      typeof data.trialExpiresAt === "string" ? data.trialExpiresAt : "",
+  };
 }

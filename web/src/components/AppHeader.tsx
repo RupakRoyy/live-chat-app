@@ -1,12 +1,29 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
+import { GenderSelector } from "@/components/GenderSelector";
 import { LinkButton } from "@/components/ui/Button";
+import type { GenderPreference } from "@/components/flow/types";
 
-export function AppHeader() {
-  const [menuOpen, setMenuOpen] = useState(false);
+type AppHeaderProps = {
+  gender?: {
+    value: GenderPreference;
+    onChange: (value: GenderPreference) => void;
+    isPro: boolean;
+    loading?: boolean;
+  };
+};
+
+export function AppHeader({ gender }: AppHeaderProps) {
+  const [openPanel, setOpenPanel] = useState<"menu" | "gender" | null>(null);
+  const menuOpen = openPanel === "menu";
+
+  useEffect(() => {
+    if (!gender) {
+      setOpenPanel((current) => (current === "gender" ? null : current));
+    }
+  }, [gender]);
 
   return (
     <header className="relative z-20 flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
@@ -22,12 +39,23 @@ export function AppHeader() {
           </LinkButton>
         </div>
 
+        {gender ? (
+          <GenderSelector
+            value={gender.value}
+            onChange={gender.onChange}
+            isPro={gender.isPro}
+            loading={gender.loading}
+            open={openPanel === "gender"}
+            onOpenChange={(open) => setOpenPanel(open ? "gender" : null)}
+          />
+        ) : null}
+
         <div className="relative shrink-0">
           <button
             type="button"
             aria-label="Open menu"
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => setOpenPanel(menuOpen ? null : "menu")}
             className="btn-press inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-charcoal/50 text-snow backdrop-blur-sm hover:bg-charcoal/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <span className="sr-only">Menu</span>
@@ -46,14 +74,14 @@ export function AppHeader() {
               <button
                 type="button"
                 className="block w-full px-4 py-3 text-left text-sm font-semibold text-charcoal hover:bg-chiffon"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => setOpenPanel(null)}
               >
                 Safety tips
               </button>
               <button
                 type="button"
                 className="block w-full px-4 py-3 text-left text-sm font-semibold text-charcoal hover:bg-chiffon"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => setOpenPanel(null)}
               >
                 Close
               </button>

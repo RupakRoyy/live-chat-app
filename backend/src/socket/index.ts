@@ -1,9 +1,14 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
+import { registerMatchmakingHandlers } from "../matchmaking/handlers.js";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from "../matchmaking/types.js";
 import { env } from "../config/env.js";
 
 export function createSocketServer(httpServer: HttpServer) {
-  const io = new Server(httpServer, {
+  const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: {
       origin: env.frontendUrl,
       methods: ["GET", "POST"],
@@ -12,6 +17,7 @@ export function createSocketServer(httpServer: HttpServer) {
 
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.id}`);
+    registerMatchmakingHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       console.log(`Socket disconnected: ${socket.id} (${reason})`);

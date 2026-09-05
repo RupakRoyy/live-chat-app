@@ -24,4 +24,6 @@ export const env = {
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   clerkSecretKey: required("CLERK_SECRET_KEY"),
   proTrialDurationHours: requiredPositiveNumber("PRO_TRIAL_DURATION_HOURS"),
+  upstashRedisRestUrl: required("UPSTASH_REDIS_REST_URL"),
+  upstashRedisRestToken: required("UPSTASH_REDIS_REST_TOKEN"),
 };

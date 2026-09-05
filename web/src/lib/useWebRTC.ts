@@ -109,6 +109,37 @@ export function useWebRTC({
   }, []);
 
   useEffect(() => {
+    if (!socket || !match) {
+      return;
+    }
+
+    const signalingSocket = socket;
+    const peerSocketId = match.peerSocketId;
+
+    const onPeerLeftEvent = (payload: { peerSocketId: string }) => {
+      if (payload.peerSocketId !== peerSocketId) {
+        return;
+      }
+
+      console.info("webrtc:peer-left", payload);
+      onPeerLeftRef.current?.();
+    };
+
+    const onDisconnect = () => {
+      console.info("webrtc:socket-disconnected", peerSocketId);
+      onPeerLeftRef.current?.();
+    };
+
+    signalingSocket.on("webrtc:peer-left", onPeerLeftEvent);
+    signalingSocket.on("disconnect", onDisconnect);
+
+    return () => {
+      signalingSocket.off("webrtc:peer-left", onPeerLeftEvent);
+      signalingSocket.off("disconnect", onDisconnect);
+    };
+  }, [match, socket]);
+
+  useEffect(() => {
     if (!enabled || !socket || !socketId || !match) {
       teardown();
       return;
@@ -289,19 +320,9 @@ export function useWebRTC({
       });
     };
 
-    const onPeerLeftEvent = (payload: { peerSocketId: string }) => {
-      if (!isCurrent() || payload.peerSocketId !== peerSocketId) {
-        return;
-      }
-
-      console.info("webrtc:peer-left", payload);
-      onPeerLeftRef.current?.();
-    };
-
     signalingSocket.on("webrtc:offer", onOffer);
     signalingSocket.on("webrtc:answer", onAnswer);
     signalingSocket.on("webrtc:ice-candidate", onIceCandidate);
-    signalingSocket.on("webrtc:peer-left", onPeerLeftEvent);
 
     void (async () => {
       setConnectionState("requesting-media");
@@ -324,6 +345,7 @@ export function useWebRTC({
         setMediaError(message);
         setConnectionState("idle");
         console.error("getUserMedia failed:", error);
+        onConnectionFailedRef.current?.();
         return;
       }
 
@@ -380,7 +402,6 @@ export function useWebRTC({
       signalingSocket.off("webrtc:offer", onOffer);
       signalingSocket.off("webrtc:answer", onAnswer);
       signalingSocket.off("webrtc:ice-candidate", onIceCandidate);
-      signalingSocket.off("webrtc:peer-left", onPeerLeftEvent);
       teardown();
     };
   }, [enabled, match, mode, socket, socketId, teardown]);

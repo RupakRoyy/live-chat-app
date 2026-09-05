@@ -345,7 +345,6 @@ export function useWebRTC({
         setMediaError(message);
         setConnectionState("idle");
         console.error("getUserMedia failed:", error);
-        onConnectionFailedRef.current?.();
         return;
       }
 

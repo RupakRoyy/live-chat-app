@@ -35,6 +35,67 @@ function emitMatchFound(io: MatchmakingServer, match: MatchPair): void {
   );
 }
 
+function isSocketConnected(io: MatchmakingServer, socketId: string): boolean {
+  return Boolean(io.sockets.sockets.get(socketId)?.connected);
+}
+
+async function cleanupDisconnectedJoiner(
+  io: MatchmakingServer,
+  socketId: string,
+): Promise<void> {
+  const match = await matchmakingService.getMatch(socketId);
+  await matchmakingService.handleDisconnect(socketId);
+
+  if (match) {
+    io.to(match.peerSocketId).emit("webrtc:peer-left", {
+      peerSocketId: socketId,
+    });
+  }
+}
+
+async function joinForConnectedSocket(
+  io: MatchmakingServer,
+  socket: MatchmakingSocket,
+  parsed: NonNullable<ReturnType<typeof parseJoinPayload>>,
+) {
+  if (!socket.connected) {
+    await cleanupDisconnectedJoiner(io, socket.id);
+    return null;
+  }
+
+  const result = await matchmakingService.joinQueue(
+    {
+      socketId: socket.id,
+      mode: parsed.mode,
+      preference: parsed.preference,
+      gender: parsed.gender,
+    },
+    {
+      isAlive: (socketId) => isSocketConnected(io, socketId),
+    },
+  );
+
+  if (!socket.connected) {
+    await cleanupDisconnectedJoiner(io, socket.id);
+    return null;
+  }
+
+  const peerSocketId =
+    result.status === "matched"
+      ? result.match.users.find((user) => user.socketId !== socket.id)?.socketId
+      : result.status === "already_matched"
+        ? result.match.peerSocketId
+        : null;
+
+  if (peerSocketId && !isSocketConnected(io, peerSocketId)) {
+    await matchmakingService.handleDisconnect(peerSocketId);
+    await matchmakingService.handleDisconnect(socket.id);
+    return joinForConnectedSocket(io, socket, parsed);
+  }
+
+  return result;
+}
+
 export function registerMatchmakingHandlers(
   io: MatchmakingServer,
   socket: MatchmakingSocket,
@@ -46,12 +107,10 @@ export function registerMatchmakingHandlers(
     }
 
     try {
-      const result = await matchmakingService.joinQueue({
-        socketId: socket.id,
-        mode: parsed.mode,
-        preference: parsed.preference,
-        gender: parsed.gender,
-      });
+      const result = await joinForConnectedSocket(io, socket, parsed);
+      if (!result) {
+        return;
+      }
 
       if (result.status === "waiting" || result.status === "already_waiting") {
         socket.emit("matchmaking:waiting", { mode: result.user.mode });

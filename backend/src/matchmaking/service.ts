@@ -79,9 +79,14 @@ function isStoredMatch(value: unknown): value is StoredMatch {
   );
 }
 
+export type JoinQueueOptions = {
+  isAlive?: (socketId: string) => boolean;
+};
+
 export type MatchmakingService = {
   joinQueue(
     user: Omit<WaitingUser, "joinedAt"> & { joinedAt?: number },
+    options?: JoinQueueOptions,
   ): Promise<JoinQueueResult>;
   leaveQueue(socketId: string): Promise<WaitingUser | null>;
   getWaiting(socketId: string): Promise<WaitingUser | null>;
@@ -207,11 +212,17 @@ export function createMatchmakingService(client: Redis): MatchmakingService {
 
   async function findCompatible(
     user: WaitingUser,
+    isAlive?: (socketId: string) => boolean,
   ): Promise<WaitingUser | null> {
     const candidateIds = await listQueuedSocketIds(user.mode);
 
     for (const candidateId of candidateIds) {
       if (candidateId === user.socketId) {
+        continue;
+      }
+
+      if (isAlive && !isAlive(candidateId)) {
+        await removeFromQueue(candidateId, user.mode);
         continue;
       }
 
@@ -231,6 +242,7 @@ export function createMatchmakingService(client: Redis): MatchmakingService {
 
   async function joinQueue(
     input: Omit<WaitingUser, "joinedAt"> & { joinedAt?: number },
+    options?: JoinQueueOptions,
   ): Promise<JoinQueueResult> {
     const user: WaitingUser = {
       socketId: input.socketId,
@@ -251,7 +263,7 @@ export function createMatchmakingService(client: Redis): MatchmakingService {
         return { status: "already_matched", match: existingMatch };
       }
 
-      const partner = await findCompatible(user);
+      const partner = await findCompatible(user, options?.isAlive);
       if (!partner) {
         await enqueue(user);
         return { status: "waiting", user };

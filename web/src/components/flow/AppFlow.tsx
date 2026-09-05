@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatView } from "@/components/chat/ChatView";
 import { LandingView } from "@/components/flow/LandingView";
@@ -11,6 +11,7 @@ import {
   type ChatMode,
   type GenderPreference,
 } from "@/components/flow/types";
+import { useMatchmaking } from "@/lib/useMatchmaking";
 import { useProStatus } from "@/lib/useProStatus";
 
 export function AppFlow() {
@@ -18,6 +19,8 @@ export function AppFlow() {
   const [mode, setMode] = useState<ChatMode>("video");
   const [gender, setGender] = useState<GenderPreference>("any");
   const { isPro, loading: proLoading, refresh } = useProStatus();
+  const { match, join, cancel, leave } = useMatchmaking();
+  const startLockRef = useRef(false);
 
   useEffect(() => {
     if (proLoading) {
@@ -29,6 +32,20 @@ export function AppFlow() {
     }
   }, [gender, isPro, proLoading]);
 
+  useEffect(() => {
+    if (!match) {
+      return;
+    }
+
+    if (state === "finding" || state === "connecting") {
+      setState("chat");
+    }
+  }, [match, state]);
+
+  function resolvedPreference(activePro = isPro): GenderPreference {
+    return canSelectGenderPreference(gender, activePro) ? gender : "any";
+  }
+
   function handleGenderChange(next: GenderPreference) {
     if (!canSelectGenderPreference(next, isPro)) {
       return;
@@ -38,13 +55,56 @@ export function AppFlow() {
   }
 
   async function handleStart() {
-    const activePro = await refresh();
-
-    if (!canSelectGenderPreference(gender, activePro)) {
-      setGender("any");
+    if (startLockRef.current) {
+      return;
     }
 
+    startLockRef.current = true;
+
+    try {
+      const activePro = await refresh();
+      const preference = resolvedPreference(activePro);
+
+      if (preference !== gender) {
+        setGender("any");
+      }
+
+      setState("finding");
+      join({
+        mode,
+        preference,
+      });
+    } catch {
+      startLockRef.current = false;
+    }
+  }
+
+  function handleCancelOrHome() {
+    cancel();
+    startLockRef.current = false;
+    setState("landing");
+  }
+
+  function handleNext() {
+    leave();
+    startLockRef.current = true;
     setState("finding");
+    join({
+      mode,
+      preference: resolvedPreference(),
+    });
+  }
+
+  function handleEnd() {
+    leave();
+    startLockRef.current = false;
+    setState("ended");
+  }
+
+  function handlePartnerLeft() {
+    leave();
+    startLockRef.current = false;
+    setState("disconnected");
   }
 
   return (
@@ -79,23 +139,16 @@ export function AppFlow() {
         state === "ended" ? (
           <StatusView
             state={state}
-            onBackHome={() => setState("landing")}
-            onContinue={
-              state === "finding"
-                ? () => setState("connecting")
-                : state === "connecting"
-                  ? () => setState("chat")
-                  : undefined
-            }
+            onBackHome={handleCancelOrHome}
           />
         ) : null}
 
         {state === "chat" ? (
           <ChatView
             mode={mode}
-            onNext={() => setState("finding")}
-            onEnd={() => setState("ended")}
-            onPartnerLeft={() => setState("disconnected")}
+            onNext={handleNext}
+            onEnd={handleEnd}
+            onPartnerLeft={handlePartnerLeft}
           />
         ) : null}
       </div>

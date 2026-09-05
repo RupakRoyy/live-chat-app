@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatView } from "@/components/chat/ChatView";
 import { LandingView } from "@/components/flow/LandingView";
@@ -11,7 +11,9 @@ import {
   type ChatMode,
   type GenderPreference,
 } from "@/components/flow/types";
+import { isMessagingMode } from "@/lib/socket";
 import { useMatchmaking } from "@/lib/useMatchmaking";
+import { useMessaging } from "@/lib/useMessaging";
 import { useProStatus } from "@/lib/useProStatus";
 import { useWebRTC } from "@/lib/useWebRTC";
 
@@ -23,11 +25,33 @@ export function AppFlow() {
   const { match, socket, socketId, join, cancel, leave } = useMatchmaking();
   const startLockRef = useRef(false);
 
-  function handlePartnerLeft() {
+  const handlePartnerLeft = useCallback(() => {
     leave();
     startLockRef.current = false;
     setState("disconnected");
-  }
+  }, [leave]);
+
+  useEffect(() => {
+    if (!socket || !match) {
+      return;
+    }
+
+    const currentSocket = socket;
+    const peerSocketId = match.peerSocketId;
+
+    const onPeerLeft = (payload: { peerSocketId: string }) => {
+      if (payload.peerSocketId !== peerSocketId) {
+        return;
+      }
+
+      handlePartnerLeft();
+    };
+
+    currentSocket.on("webrtc:peer-left", onPeerLeft);
+    return () => {
+      currentSocket.off("webrtc:peer-left", onPeerLeft);
+    };
+  }, [handlePartnerLeft, match, socket]);
 
   const media = useWebRTC({
     socket,
@@ -37,6 +61,13 @@ export function AppFlow() {
     enabled: state === "chat" && Boolean(match) && mode !== "text",
     onPeerLeft: handlePartnerLeft,
     onConnectionFailed: handlePartnerLeft,
+  });
+
+  const messaging = useMessaging({
+    socket,
+    socketId,
+    match,
+    enabled: state === "chat" && Boolean(match) && isMessagingMode(mode),
   });
 
   useEffect(() => {
@@ -157,6 +188,7 @@ export function AppFlow() {
         {state === "chat" ? (
           <ChatView
             mode={mode}
+            matchId={match?.matchId}
             onNext={handleNext}
             onEnd={handleEnd}
             onPartnerLeft={handlePartnerLeft}
@@ -167,6 +199,9 @@ export function AppFlow() {
             cameraOn={media.cameraOn}
             onToggleMic={media.toggleMic}
             onToggleCamera={media.toggleCamera}
+            messages={messaging.messages}
+            canSend={messaging.canSend}
+            onSendMessage={messaging.sendMessage}
           />
         ) : null}
       </div>

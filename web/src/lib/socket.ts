@@ -71,12 +71,30 @@ export type WebRtcPeerLeftPayload = {
   peerSocketId: string;
 };
 
+export const MAX_MESSAGE_LENGTH = 2000;
+export const MESSAGING_MODES = ["text", "video"] as const;
+export type MessagingMode = (typeof MESSAGING_MODES)[number];
+
+export type MessageSendPayload = {
+  matchId: string;
+  text: string;
+};
+
+export type MessageReceivedPayload = {
+  messageId: string;
+  matchId: string;
+  senderSocketId: string;
+  text: string;
+  timestamp: number;
+};
+
 export type ClientToServerEvents = {
   "matchmaking:join": (payload: MatchmakingJoinPayload) => void;
   "matchmaking:cancel": () => void;
   "webrtc:offer": (payload: WebRtcOfferPayload) => void;
   "webrtc:answer": (payload: WebRtcAnswerPayload) => void;
   "webrtc:ice-candidate": (payload: WebRtcIceCandidatePayload) => void;
+  "message:send": (payload: MessageSendPayload) => void;
 };
 
 export type ServerToClientEvents = {
@@ -87,7 +105,52 @@ export type ServerToClientEvents = {
   "webrtc:answer": (payload: WebRtcAnswerIncoming) => void;
   "webrtc:ice-candidate": (payload: WebRtcIceCandidateIncoming) => void;
   "webrtc:peer-left": (payload: WebRtcPeerLeftPayload) => void;
+  "message:received": (payload: MessageReceivedPayload) => void;
 };
+
+export function isMessagingMode(mode: ChatMode): mode is MessagingMode {
+  return (MESSAGING_MODES as readonly string[]).includes(mode);
+}
+
+export function parseMessageReceived(
+  raw: unknown,
+): MessageReceivedPayload | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const payload = raw as Partial<MessageReceivedPayload>;
+  if (typeof payload.messageId !== "string" || payload.messageId.length === 0) {
+    return null;
+  }
+
+  if (typeof payload.matchId !== "string" || payload.matchId.length === 0) {
+    return null;
+  }
+
+  if (
+    typeof payload.senderSocketId !== "string" ||
+    payload.senderSocketId.length === 0
+  ) {
+    return null;
+  }
+
+  if (typeof payload.text !== "string") {
+    return null;
+  }
+
+  if (typeof payload.timestamp !== "number" || !Number.isFinite(payload.timestamp)) {
+    return null;
+  }
+
+  return {
+    messageId: payload.messageId,
+    matchId: payload.matchId,
+    senderSocketId: payload.senderSocketId,
+    text: payload.text,
+    timestamp: payload.timestamp,
+  };
+}
 
 export type MatchmakingSocket = Socket<
   ServerToClientEvents,

@@ -91,6 +91,10 @@ type ControlBarProps = {
   onNext: () => void;
   onEnd: () => void;
   onPartnerLeft: () => void;
+  micOn?: boolean;
+  cameraOn?: boolean;
+  onToggleMic?: () => void;
+  onToggleCamera?: () => void;
 };
 
 export function ControlBar({
@@ -98,12 +102,36 @@ export function ControlBar({
   onNext,
   onEnd,
   onPartnerLeft,
+  micOn: micOnProp,
+  cameraOn: cameraOnProp,
+  onToggleMic,
+  onToggleCamera,
 }: ControlBarProps) {
-  const [micOn, setMicOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
+  const [micOnLocal, setMicOnLocal] = useState(true);
+  const [cameraOnLocal, setCameraOnLocal] = useState(true);
   const [reported, setReported] = useState(false);
+  const micOn = micOnProp ?? micOnLocal;
+  const cameraOn = cameraOnProp ?? cameraOnLocal;
   const showCamera = mode === "video";
   const showMic = mode !== "text";
+
+  function handleMicToggle() {
+    if (onToggleMic) {
+      onToggleMic();
+      return;
+    }
+
+    setMicOnLocal((value) => !value);
+  }
+
+  function handleCameraToggle() {
+    if (onToggleCamera) {
+      onToggleCamera();
+      return;
+    }
+
+    setCameraOnLocal((value) => !value);
+  }
 
   return (
     <div className="space-y-3">
@@ -114,7 +142,7 @@ export function ControlBar({
               variant={micOn ? "secondary" : "ghost"}
               aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
               aria-pressed={!micOn}
-              onClick={() => setMicOn((value) => !value)}
+              onClick={handleMicToggle}
               className="min-w-10 px-3 text-charcoal"
             >
               <MicIcon muted={!micOn} />
@@ -127,7 +155,7 @@ export function ControlBar({
               variant={cameraOn ? "secondary" : "ghost"}
               aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
               aria-pressed={!cameraOn}
-              onClick={() => setCameraOn((value) => !value)}
+              onClick={handleCameraToggle}
               className="min-w-10 px-3 text-charcoal"
             >
               <CameraIcon off={!cameraOn} />

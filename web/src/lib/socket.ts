@@ -25,15 +25,68 @@ export type MatchmakingCancelledPayload = {
   mode?: ChatMode;
 };
 
+export type SignalingDescription = {
+  type: "offer" | "answer";
+  sdp: string;
+};
+
+export type SignalingIceCandidate = {
+  candidate?: string;
+  sdpMid?: string | null;
+  sdpMLineIndex?: number | null;
+  usernameFragment?: string | null;
+};
+
+export type WebRtcOfferPayload = {
+  to: string;
+  description: SignalingDescription;
+};
+
+export type WebRtcAnswerPayload = {
+  to: string;
+  description: SignalingDescription;
+};
+
+export type WebRtcIceCandidatePayload = {
+  to: string;
+  candidate: SignalingIceCandidate;
+};
+
+export type WebRtcOfferIncoming = {
+  from: string;
+  description: SignalingDescription;
+};
+
+export type WebRtcAnswerIncoming = {
+  from: string;
+  description: SignalingDescription;
+};
+
+export type WebRtcIceCandidateIncoming = {
+  from: string;
+  candidate: SignalingIceCandidate;
+};
+
+export type WebRtcPeerLeftPayload = {
+  peerSocketId: string;
+};
+
 export type ClientToServerEvents = {
   "matchmaking:join": (payload: MatchmakingJoinPayload) => void;
   "matchmaking:cancel": () => void;
+  "webrtc:offer": (payload: WebRtcOfferPayload) => void;
+  "webrtc:answer": (payload: WebRtcAnswerPayload) => void;
+  "webrtc:ice-candidate": (payload: WebRtcIceCandidatePayload) => void;
 };
 
 export type ServerToClientEvents = {
   "matchmaking:waiting": (payload: MatchmakingWaitingPayload) => void;
   match_found: (payload: MatchFoundPayload) => void;
   "matchmaking:cancelled": (payload: MatchmakingCancelledPayload) => void;
+  "webrtc:offer": (payload: WebRtcOfferIncoming) => void;
+  "webrtc:answer": (payload: WebRtcAnswerIncoming) => void;
+  "webrtc:ice-candidate": (payload: WebRtcIceCandidateIncoming) => void;
+  "webrtc:peer-left": (payload: WebRtcPeerLeftPayload) => void;
 };
 
 export type MatchmakingSocket = Socket<

@@ -13,14 +13,31 @@ import {
 } from "@/components/flow/types";
 import { useMatchmaking } from "@/lib/useMatchmaking";
 import { useProStatus } from "@/lib/useProStatus";
+import { useWebRTC } from "@/lib/useWebRTC";
 
 export function AppFlow() {
   const [state, setState] = useState<AppState>("landing");
   const [mode, setMode] = useState<ChatMode>("video");
   const [gender, setGender] = useState<GenderPreference>("any");
   const { isPro, loading: proLoading, refresh } = useProStatus();
-  const { match, join, cancel, leave } = useMatchmaking();
+  const { match, socket, socketId, join, cancel, leave } = useMatchmaking();
   const startLockRef = useRef(false);
+
+  function handlePartnerLeft() {
+    leave();
+    startLockRef.current = false;
+    setState("disconnected");
+  }
+
+  const media = useWebRTC({
+    socket,
+    socketId,
+    match,
+    mode,
+    enabled: state === "chat" && Boolean(match) && mode !== "text",
+    onPeerLeft: handlePartnerLeft,
+    onConnectionFailed: handlePartnerLeft,
+  });
 
   useEffect(() => {
     if (proLoading) {
@@ -101,12 +118,6 @@ export function AppFlow() {
     setState("ended");
   }
 
-  function handlePartnerLeft() {
-    leave();
-    startLockRef.current = false;
-    setState("disconnected");
-  }
-
   return (
     <div className="relative flex min-h-dvh flex-1 flex-col overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-0 app-backdrop" />
@@ -149,6 +160,13 @@ export function AppFlow() {
             onNext={handleNext}
             onEnd={handleEnd}
             onPartnerLeft={handlePartnerLeft}
+            localStream={media.localStream}
+            remoteStream={media.remoteStream}
+            connectionState={media.connectionState}
+            micOn={media.micOn}
+            cameraOn={media.cameraOn}
+            onToggleMic={media.toggleMic}
+            onToggleCamera={media.toggleCamera}
           />
         ) : null}
       </div>

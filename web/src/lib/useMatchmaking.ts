@@ -23,16 +23,20 @@ export function useMatchmaking() {
   const phaseRef = useRef<"idle" | "joining" | "waiting" | "matched">("idle");
   const joinPayloadRef = useRef<MatchmakingJoinInput | null>(null);
   const [match, setMatch] = useState<MatchFoundPayload | null>(null);
+  const [socket, setSocket] = useState<MatchmakingSocket | null>(null);
+  const [socketId, setSocketId] = useState<string | null>(null);
 
   const disposeSocket = useCallback(() => {
-    const socket = socketRef.current;
-    if (!socket) {
+    const current = socketRef.current;
+    if (!current) {
       return;
     }
 
-    socket.removeAllListeners();
-    socket.disconnect();
+    current.removeAllListeners();
+    current.disconnect();
     socketRef.current = null;
+    setSocket(null);
+    setSocketId(null);
   }, []);
 
   const reset = useCallback(() => {
@@ -70,8 +74,9 @@ export function useMatchmaking() {
 
       disposeSocket();
 
-      const socket = createMatchmakingSocket();
-      socketRef.current = socket;
+      const nextSocket = createMatchmakingSocket();
+      socketRef.current = nextSocket;
+      setSocket(nextSocket);
 
       const emitJoin = () => {
         const payload = joinPayloadRef.current;
@@ -83,28 +88,29 @@ export function useMatchmaking() {
           return;
         }
 
-        socket.emit("matchmaking:join", toJoinPayload(payload));
+        setSocketId(nextSocket.id ?? null);
+        nextSocket.emit("matchmaking:join", toJoinPayload(payload));
       };
 
-      socket.on("connect", emitJoin);
+      nextSocket.on("connect", emitJoin);
 
-      socket.on("matchmaking:waiting", (payload) => {
+      nextSocket.on("matchmaking:waiting", (payload) => {
         phaseRef.current = "waiting";
         console.info("matchmaking:waiting", payload);
       });
 
-      socket.on("match_found", (payload) => {
+      nextSocket.on("match_found", (payload) => {
         phaseRef.current = "matched";
         joinLockRef.current = true;
         console.info("match_found", payload);
         setMatch(payload);
       });
 
-      socket.on("connect_error", (error) => {
+      nextSocket.on("connect_error", (error) => {
         console.error("Matchmaking socket error:", error.message);
       });
 
-      socket.connect();
+      nextSocket.connect();
     },
     [disposeSocket],
   );
@@ -117,6 +123,8 @@ export function useMatchmaking() {
 
   return {
     match,
+    socket,
+    socketId,
     join,
     cancel,
     leave,

@@ -1,11 +1,13 @@
 import type { Server, Socket } from "socket.io";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from "../socket/events.js";
 import { matchmakingService } from "./service.js";
 import {
   parseJoinPayload,
   toMatchFoundPayload,
-  type ClientToServerEvents,
   type MatchPair,
-  type ServerToClientEvents,
 } from "./types.js";
 
 type MatchmakingServer = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -79,7 +81,16 @@ export function registerMatchmakingHandlers(
   });
 
   socket.on("disconnect", () => {
-    void matchmakingService.handleDisconnect(socket.id).catch((error) => {
+    void (async () => {
+      const match = await matchmakingService.getMatch(socket.id);
+      await matchmakingService.handleDisconnect(socket.id);
+
+      if (match) {
+        io.to(match.peerSocketId).emit("webrtc:peer-left", {
+          peerSocketId: socket.id,
+        });
+      }
+    })().catch((error) => {
       console.error(`matchmaking disconnect cleanup failed for ${socket.id}:`, error);
     });
   });

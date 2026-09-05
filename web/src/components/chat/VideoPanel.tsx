@@ -44,7 +44,7 @@ export function VideoPanel({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-video-stage ${className}`}
+      className={`relative min-h-0 overflow-hidden bg-video-stage ${className}`}
     >
       <div
         className={`absolute inset-0 ${
@@ -64,7 +64,7 @@ export function VideoPanel({
         } ${mirrored ? "-scale-x-100" : ""}`}
       />
 
-      <div className="relative flex h-full min-h-[10rem] flex-col items-center justify-center gap-2 p-4 text-center">
+      <div className="relative flex h-full min-h-0 flex-col items-center justify-center gap-2 p-4 text-center">
         <span className="rounded-full bg-charcoal/60 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-snow/85">
           {label}
         </span>

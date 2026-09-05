@@ -44,7 +44,7 @@ export function ChatView({
   const showMessaging = mode === "text" || mode === "video";
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6 sm:px-6">
+    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6 sm:px-6">
       <span
         className="sr-only"
         data-webrtc-state={connectionState ?? "idle"}
@@ -60,26 +60,28 @@ export function ChatView({
 
       <div
         className={
-          showMessaging
-            ? "grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.9fr)]"
-            : "grid min-h-0 flex-1"
+          showVideo && showMessaging
+            ? "grid min-h-0 flex-1 grid-rows-[minmax(16rem,1fr)_minmax(10rem,13rem)] gap-4 lg:grid-rows-none lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.9fr)]"
+            : showMessaging
+              ? "grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.9fr)]"
+              : "grid min-h-0 flex-1"
         }
       >
         {showVideo ? (
           <section
             aria-label="Video stage"
-            className="relative min-h-[22rem] overflow-hidden rounded-2xl sm:min-h-[28rem] lg:min-h-0"
+            className="grid h-full min-h-0 grid-rows-2 gap-px overflow-hidden rounded-2xl bg-snow/20"
           >
             <VideoPanel
               label="Stranger"
               variant="primary"
-              className="absolute inset-0"
+              className="min-h-0"
               stream={remoteStream}
             />
             <VideoPanel
               label="You"
               variant="secondary"
-              className="absolute bottom-3 right-3 z-10 aspect-video w-[36%] max-w-[11.5rem] border-[3px] border-accent shadow-[0_12px_28px_-12px_rgba(0,0,0,0.5)] sm:bottom-4 sm:right-4 sm:max-w-[13.5rem]"
+              className="min-h-0"
               stream={localStream}
               muted
               mirrored
@@ -102,7 +104,7 @@ export function ChatView({
         )}
 
         {showMessaging ? (
-          <div className="min-h-[16rem] lg:min-h-0">
+          <div className={showVideo ? "min-h-0" : "min-h-[16rem] lg:min-h-0"}>
             <ChatPanel
               matchId={matchId}
               messages={messages}

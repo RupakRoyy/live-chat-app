@@ -3,6 +3,9 @@ import type { Redis } from "@upstash/redis";
 import { redis } from "../config/redis.js";
 import {
   areUsersCompatible,
+  isChatMode,
+  isGenderPreference,
+  isUserGender,
   type ChatMode,
   type JoinQueueResult,
   type MatchPair,
@@ -58,12 +61,24 @@ function isWaitingUser(value: unknown): value is WaitingUser {
   }
 
   const user = value as Partial<WaitingUser>;
-  return (
-    typeof user.socketId === "string" &&
-    typeof user.mode === "string" &&
-    typeof user.preference === "string" &&
-    typeof user.joinedAt === "number"
-  );
+  if (
+    typeof user.socketId !== "string" ||
+    !isChatMode(user.mode) ||
+    !isGenderPreference(user.preference) ||
+    typeof user.joinedAt !== "number"
+  ) {
+    return false;
+  }
+
+  if (user.gender !== undefined && !isUserGender(user.gender)) {
+    return false;
+  }
+
+  if (user.userId !== undefined && typeof user.userId !== "string") {
+    return false;
+  }
+
+  return true;
 }
 
 function isStoredMatch(value: unknown): value is StoredMatch {
@@ -249,6 +264,7 @@ export function createMatchmakingService(client: Redis): MatchmakingService {
       mode: input.mode,
       preference: input.preference,
       gender: input.gender,
+      userId: input.userId,
       joinedAt: input.joinedAt ?? Date.now(),
     };
 

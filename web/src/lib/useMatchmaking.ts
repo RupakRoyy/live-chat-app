@@ -7,22 +7,27 @@ import {
   toJoinPayload,
   type GenderPreference,
   type MatchFoundPayload,
+  type MatchmakingErrorPayload,
   type MatchmakingSocket,
-  type UserGender,
   type ChatMode,
 } from "./socket";
 
 export type MatchmakingJoinInput = {
   mode: ChatMode;
   preference: GenderPreference;
-  gender?: UserGender;
 };
 
-export function useMatchmaking() {
+export type UseMatchmakingOptions = {
+  onError?: (error: MatchmakingErrorPayload) => void;
+};
+
+export function useMatchmaking(options: UseMatchmakingOptions = {}) {
   const socketRef = useRef<MatchmakingSocket | null>(null);
   const joinLockRef = useRef(false);
   const phaseRef = useRef<"idle" | "joining" | "waiting" | "matched">("idle");
   const joinPayloadRef = useRef<MatchmakingJoinInput | null>(null);
+  const onErrorRef = useRef(options.onError);
+  onErrorRef.current = options.onError;
   const [match, setMatch] = useState<MatchFoundPayload | null>(null);
   const [socket, setSocket] = useState<MatchmakingSocket | null>(null);
   const [socketId, setSocketId] = useState<string | null>(null);
@@ -107,13 +112,22 @@ export function useMatchmaking() {
         setMatch(payload);
       });
 
+      nextSocket.on("matchmaking:error", (payload) => {
+        console.info("matchmaking:error", payload);
+        joinLockRef.current = false;
+        phaseRef.current = "idle";
+        onErrorRef.current?.(payload);
+        disposeSocket();
+        reset();
+      });
+
       nextSocket.on("connect_error", (error) => {
         console.error("Matchmaking socket error:", error.message);
       });
 
       nextSocket.connect();
     },
-    [disposeSocket],
+    [disposeSocket, reset],
   );
 
   useEffect(() => {

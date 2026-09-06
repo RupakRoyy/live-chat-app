@@ -1,5 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import { resolveGenderPreference } from "../entitlements/index.js";
+import { resolveMatchmakingJoin } from "../entitlements/index.js";
 import { getSocketUserId } from "../socket/auth.js";
 import type {
   ClientToServerEvents,
@@ -7,10 +7,21 @@ import type {
 } from "../socket/events.js";
 import { matchmakingService } from "./service.js";
 import {
+  isGenderPreference,
   parseJoinPayload,
   toMatchFoundPayload,
+  type ChatMode,
+  type GenderPreference,
   type MatchPair,
+  type UserGender,
 } from "./types.js";
+
+type ResolvedJoin = {
+  mode: ChatMode;
+  preference: GenderPreference;
+  gender?: UserGender;
+  userId?: string;
+};
 
 type MatchmakingServer = Server<ClientToServerEvents, ServerToClientEvents>;
 type MatchmakingSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -58,7 +69,7 @@ async function cleanupDisconnectedJoiner(
 async function joinForConnectedSocket(
   io: MatchmakingServer,
   socket: MatchmakingSocket,
-  parsed: NonNullable<ReturnType<typeof parseJoinPayload>>,
+  join: ResolvedJoin,
 ) {
   if (!socket.connected) {
     await cleanupDisconnectedJoiner(io, socket.id);
@@ -68,9 +79,10 @@ async function joinForConnectedSocket(
   const result = await matchmakingService.joinQueue(
     {
       socketId: socket.id,
-      mode: parsed.mode,
-      preference: parsed.preference,
-      gender: parsed.gender,
+      mode: join.mode,
+      preference: join.preference,
+      gender: join.gender,
+      userId: join.userId,
     },
     {
       isAlive: (socketId) => isSocketConnected(io, socketId),
@@ -92,7 +104,7 @@ async function joinForConnectedSocket(
   if (peerSocketId && !isSocketConnected(io, peerSocketId)) {
     await matchmakingService.handleDisconnect(peerSocketId);
     await matchmakingService.handleDisconnect(socket.id);
-    return joinForConnectedSocket(io, socket, parsed);
+    return joinForConnectedSocket(io, socket, join);
   }
 
   return result;
@@ -109,13 +121,28 @@ export function registerMatchmakingHandlers(
     }
 
     try {
-      const preference = await resolveGenderPreference(
+      const resolved = await resolveMatchmakingJoin(
         getSocketUserId(socket),
         parsed.preference,
       );
+
+      if (!resolved.ok) {
+        socket.emit("matchmaking:error", {
+          code: resolved.code,
+          message: resolved.message,
+        });
+        return;
+      }
+
+      if (!isGenderPreference(resolved.preference)) {
+        return;
+      }
+
       const result = await joinForConnectedSocket(io, socket, {
-        ...parsed,
-        preference,
+        mode: parsed.mode,
+        preference: resolved.preference,
+        gender: resolved.ownGender,
+        userId: resolved.userId,
       });
       if (!result) {
         return;

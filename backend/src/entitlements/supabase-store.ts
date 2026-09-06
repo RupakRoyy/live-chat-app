@@ -1,10 +1,19 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { EntitlementRecord, EntitlementStore } from "./types.js";
+import {
+  isOwnGender,
+  type EntitlementRecord,
+  type EntitlementStore,
+  type OwnGender,
+} from "./types.js";
+
+const ENTITLEMENT_COLUMNS =
+  "user_id, trial_started_at, trial_expires_at, own_gender";
 
 type EntitlementRow = {
   user_id: string;
   trial_started_at: string;
   trial_expires_at: string;
+  own_gender?: string | null;
 };
 
 function isRow(value: unknown): value is EntitlementRow {
@@ -21,10 +30,13 @@ function isRow(value: unknown): value is EntitlementRow {
 }
 
 function toRecord(row: EntitlementRow): EntitlementRecord {
+  const ownGender = isOwnGender(row.own_gender) ? row.own_gender : undefined;
+
   return {
     userId: row.user_id,
     trialStartedAt: new Date(row.trial_started_at).toISOString(),
     trialExpiresAt: new Date(row.trial_expires_at).toISOString(),
+    ...(ownGender ? { ownGender } : {}),
   };
 }
 
@@ -53,7 +65,7 @@ export function createSupabaseEntitlementStore(options: {
   async function getByUserId(userId: string): Promise<EntitlementRecord | null> {
     const { data, error } = await client
       .from("user_entitlements")
-      .select("user_id, trial_started_at, trial_expires_at")
+      .select(ENTITLEMENT_COLUMNS)
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -79,8 +91,9 @@ export function createSupabaseEntitlementStore(options: {
           user_id: record.userId,
           trial_started_at: record.trialStartedAt,
           trial_expires_at: record.trialExpiresAt,
+          own_gender: record.ownGender ?? null,
         })
-        .select("user_id, trial_started_at, trial_expires_at")
+        .select(ENTITLEMENT_COLUMNS)
         .single();
 
       if (isUniqueViolation(error)) {
@@ -99,6 +112,21 @@ export function createSupabaseEntitlementStore(options: {
       }
 
       return toRecord(data);
+    },
+
+    async updateOwnGender(userId: string, ownGender: OwnGender) {
+      const { data, error } = await client
+        .from("user_entitlements")
+        .update({ own_gender: ownGender })
+        .eq("user_id", userId)
+        .select(ENTITLEMENT_COLUMNS)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      return isRow(data) ? toRecord(data) : null;
     },
   };
 }

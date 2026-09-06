@@ -20,6 +20,8 @@ type AppHeaderProps = {
     onChange: (value: GenderPreference) => void;
     isPro: boolean;
     loading?: boolean;
+    ownGenderSet?: boolean;
+    onNeedOwnGender?: () => void;
   };
 };
 
@@ -94,6 +96,8 @@ export function AppHeader({ entitlement, gender }: AppHeaderProps) {
             onChange={gender.onChange}
             isPro={gender.isPro}
             loading={gender.loading}
+            ownGenderSet={gender.ownGenderSet}
+            onNeedOwnGender={gender.onNeedOwnGender}
             open={openPanel === "gender"}
             onOpenChange={(open) => setOpenPanel(open ? "gender" : null)}
           />

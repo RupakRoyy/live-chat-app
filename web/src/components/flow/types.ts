@@ -1,9 +1,15 @@
 export type ChatMode = "text" | "voice" | "video";
 
 export type GenderPreference = "any" | "female" | "male";
+export type OwnGender = "male" | "female";
 
 export const genderPreferenceLabels: Record<GenderPreference, string> = {
   any: "Any Gender",
+  female: "Female",
+  male: "Male",
+};
+
+export const ownGenderLabels: Record<OwnGender, string> = {
   female: "Female",
   male: "Male",
 };

@@ -25,6 +25,11 @@ export type MatchmakingCancelledPayload = {
   mode?: ChatMode;
 };
 
+export type MatchmakingErrorPayload = {
+  code: "own_gender_required";
+  message: string;
+};
+
 export type SignalingDescription = {
   type: "offer" | "answer";
   sdp: string;
@@ -101,6 +106,7 @@ export type ServerToClientEvents = {
   "matchmaking:waiting": (payload: MatchmakingWaitingPayload) => void;
   match_found: (payload: MatchFoundPayload) => void;
   "matchmaking:cancelled": (payload: MatchmakingCancelledPayload) => void;
+  "matchmaking:error": (payload: MatchmakingErrorPayload) => void;
   "webrtc:offer": (payload: WebRtcOfferIncoming) => void;
   "webrtc:answer": (payload: WebRtcAnswerIncoming) => void;
   "webrtc:ice-candidate": (payload: WebRtcIceCandidateIncoming) => void;
@@ -164,18 +170,11 @@ export function getSocketUrl(): string {
 export function toJoinPayload(input: {
   mode: ChatMode;
   preference: GenderPreference;
-  gender?: UserGender;
 }): MatchmakingJoinPayload {
-  const payload: MatchmakingJoinPayload = {
+  return {
     mode: input.mode,
     preference: input.preference,
   };
-
-  if (input.gender) {
-    payload.gender = input.gender;
-  }
-
-  return payload;
 }
 
 export function createMatchmakingSocket(

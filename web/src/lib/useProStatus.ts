@@ -15,10 +15,10 @@ export function useProStatus() {
     try {
       const status = await fetchAuthMe();
       setEntitlement(status);
-      return status.canUseSpecificGender;
+      return status;
     } catch {
       setEntitlement(ANONYMOUS_AUTH_ME);
-      return false;
+      return ANONYMOUS_AUTH_ME;
     }
   }, []);
 
@@ -95,6 +95,7 @@ export function useProStatus() {
     trial: entitlement.trial,
     trialExpiresAt: entitlement.trialExpiresAt ?? null,
     canUseSpecificGender: entitlement.canUseSpecificGender,
+    ownGender: entitlement.ownGender ?? null,
     loading: !isLoaded || loading,
     refresh,
   };

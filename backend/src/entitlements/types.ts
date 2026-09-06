@@ -1,7 +1,11 @@
+export const OWN_GENDERS = ["male", "female"] as const;
+export type OwnGender = (typeof OWN_GENDERS)[number];
+
 export type EntitlementRecord = {
   userId: string;
   trialStartedAt: string;
   trialExpiresAt: string;
+  ownGender?: OwnGender;
 };
 
 export type ProStatus = {
@@ -25,6 +29,7 @@ export type AuthenticatedEntitlement = {
   trialStartedAt: string;
   trialExpiresAt: string;
   canUseSpecificGender: boolean;
+  ownGender: OwnGender | null;
 };
 
 export type EntitlementSnapshot = AnonymousEntitlement | AuthenticatedEntitlement;
@@ -40,6 +45,25 @@ export interface EntitlementStore {
    * Returns the existing record when one is already stored.
    */
   insertIfAbsent(record: EntitlementRecord): Promise<EntitlementRecord>;
+  /**
+   * Persist own gender for an existing user record.
+   * Returns null when the user has no entitlement row yet.
+   */
+  updateOwnGender(
+    userId: string,
+    ownGender: OwnGender,
+  ): Promise<EntitlementRecord | null>;
+}
+
+export function isOwnGender(value: unknown): value is OwnGender {
+  return (
+    typeof value === "string" &&
+    (OWN_GENDERS as readonly string[]).includes(value)
+  );
+}
+
+export function parseOwnGender(value: unknown): OwnGender | null {
+  return isOwnGender(value) ? value : null;
 }
 
 /** Canonical free gender preference. Specific genders require active Pro. */

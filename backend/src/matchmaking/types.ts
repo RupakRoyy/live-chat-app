@@ -11,8 +11,19 @@ export type MatchmakingJoinPayload = {
   mode: ChatMode;
   /** Who this user wants to match with. Defaults to `any`. */
   preference?: GenderPreference;
-  /** This user's own gender. Required to satisfy a peer's specific preference. */
+  /**
+   * Ignored if present. Own gender is loaded from the authenticated
+   * profile record and is never taken from the client.
+   */
   gender?: UserGender;
+};
+
+export const MATCHMAKING_ERROR_CODES = ["own_gender_required"] as const;
+export type MatchmakingErrorCode = (typeof MATCHMAKING_ERROR_CODES)[number];
+
+export type MatchmakingErrorPayload = {
+  code: MatchmakingErrorCode;
+  message: string;
 };
 
 export type MatchmakingWaitingPayload = {
@@ -33,7 +44,10 @@ export type WaitingUser = {
   socketId: string;
   mode: ChatMode;
   preference: GenderPreference;
+  /** Server-sourced own gender. Never taken from the join payload. */
   gender?: UserGender;
+  /** Verified Clerk user id when the socket is authenticated. */
+  userId?: string;
   joinedAt: number;
 };
 
@@ -64,6 +78,7 @@ export interface ServerToClientEvents {
   "matchmaking:waiting": (payload: MatchmakingWaitingPayload) => void;
   match_found: (payload: MatchFoundPayload) => void;
   "matchmaking:cancelled": (payload: MatchmakingCancelledPayload) => void;
+  "matchmaking:error": (payload: MatchmakingErrorPayload) => void;
 }
 
 export function isChatMode(value: unknown): value is ChatMode {
@@ -89,12 +104,14 @@ export function isGenderPreference(value: unknown): value is GenderPreference {
 
 export function parseJoinPayload(
   raw: unknown,
-): Omit<WaitingUser, "socketId" | "joinedAt"> | null {
+): { mode: ChatMode; preference: GenderPreference } | null {
   if (!raw || typeof raw !== "object") {
     return null;
   }
 
-  const payload = raw as Partial<MatchmakingJoinPayload>;
+  const payload = raw as Partial<MatchmakingJoinPayload> & {
+    userId?: unknown;
+  };
   if (!isChatMode(payload.mode)) {
     return null;
   }
@@ -104,14 +121,9 @@ export function parseJoinPayload(
     return null;
   }
 
-  if (payload.gender !== undefined && !isUserGender(payload.gender)) {
-    return null;
-  }
-
   return {
     mode: payload.mode,
     preference,
-    gender: payload.gender,
   };
 }
 

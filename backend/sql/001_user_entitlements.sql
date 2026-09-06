@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS user_entitlements (
   user_id TEXT PRIMARY KEY,
   trial_started_at TIMESTAMPTZ NOT NULL,
   trial_expires_at TIMESTAMPTZ NOT NULL,
+  own_gender TEXT CHECK (own_gender IS NULL OR own_gender IN ('male', 'female')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

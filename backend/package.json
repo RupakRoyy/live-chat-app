@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "tsx --test test/entitlements.test.ts"
+    "test": "tsx --test test/entitlements.test.ts test/matchmaking.test.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.17.1",

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatView } from "@/components/chat/ChatView";
+import { OwnGenderSetup } from "@/components/OwnGenderSetup";
 import { LandingView } from "@/components/flow/LandingView";
 import { StatusView } from "@/components/flow/StatusView";
 import {
@@ -10,8 +11,10 @@ import {
   type AppState,
   type ChatMode,
   type GenderPreference,
+  type OwnGender,
 } from "@/components/flow/types";
-import { isMessagingMode } from "@/lib/socket";
+import { updateOwnGender } from "@/lib/api";
+import { isMessagingMode, type MatchmakingErrorPayload } from "@/lib/socket";
 import { useMatchmaking } from "@/lib/useMatchmaking";
 import { useMessaging } from "@/lib/useMessaging";
 import { useProStatus } from "@/lib/useProStatus";
@@ -21,16 +24,42 @@ export function AppFlow() {
   const [state, setState] = useState<AppState>("landing");
   const [mode, setMode] = useState<ChatMode>("video");
   const [gender, setGender] = useState<GenderPreference>("any");
+  const [ownGenderPrompt, setOwnGenderPrompt] = useState<
+    "hidden" | "welcome" | "required"
+  >("hidden");
+  const [pendingPreference, setPendingPreference] =
+    useState<GenderPreference | null>(null);
+  const [savingOwnGender, setSavingOwnGender] = useState(false);
+  const [ownGenderError, setOwnGenderError] = useState<string | null>(null);
   const {
     authenticated,
     isPro,
     trial,
     trialExpiresAt,
+    ownGender,
     loading: proLoading,
     refresh,
   } = useProStatus();
-  const { match, socket, socketId, join, cancel, leave } = useMatchmaking();
   const startLockRef = useRef(false);
+  const skippedOwnGenderRef = useRef(false);
+
+  const handleMatchmakingError = useCallback(
+    (error: MatchmakingErrorPayload) => {
+      startLockRef.current = false;
+      setGender("any");
+      setPendingPreference(null);
+
+      if (error.code === "own_gender_required") {
+        setOwnGenderPrompt("required");
+        setState("landing");
+      }
+    },
+    [],
+  );
+
+  const { match, socket, socketId, join, cancel, leave } = useMatchmaking({
+    onError: handleMatchmakingError,
+  });
 
   const handlePartnerLeft = useCallback(() => {
     leave();
@@ -88,6 +117,25 @@ export function AppFlow() {
   }, [gender, isPro, proLoading]);
 
   useEffect(() => {
+    if (proLoading || !authenticated || ownGender || skippedOwnGenderRef.current) {
+      return;
+    }
+
+    if (state !== "landing") {
+      return;
+    }
+
+    setOwnGenderPrompt((current) => (current === "hidden" ? "welcome" : current));
+  }, [authenticated, ownGender, proLoading, state]);
+
+  useEffect(() => {
+    if (ownGender) {
+      setOwnGenderPrompt("hidden");
+      setOwnGenderError(null);
+    }
+  }, [ownGender]);
+
+  useEffect(() => {
     if (!match) {
       return;
     }
@@ -101,12 +149,52 @@ export function AppFlow() {
     return canSelectGenderPreference(gender, activePro) ? gender : "any";
   }
 
+  function handleNeedOwnGender(nextPreference?: GenderPreference) {
+    if (nextPreference && nextPreference !== "any") {
+      setPendingPreference(nextPreference);
+    }
+
+    setOwnGenderPrompt("required");
+  }
+
   function handleGenderChange(next: GenderPreference) {
     if (!canSelectGenderPreference(next, isPro)) {
       return;
     }
 
+    if (next !== "any" && !ownGender) {
+      handleNeedOwnGender(next);
+      return;
+    }
+
     setGender(next);
+  }
+
+  function handleSkipOwnGender() {
+    skippedOwnGenderRef.current = true;
+    setPendingPreference(null);
+    setOwnGenderError(null);
+    setOwnGenderPrompt("hidden");
+    setGender("any");
+  }
+
+  async function handleSaveOwnGender(value: OwnGender) {
+    setSavingOwnGender(true);
+    setOwnGenderError(null);
+
+    try {
+      await updateOwnGender(value);
+      await refresh();
+      setOwnGenderPrompt("hidden");
+      if (pendingPreference && canSelectGenderPreference(pendingPreference, isPro)) {
+        setGender(pendingPreference);
+      }
+      setPendingPreference(null);
+    } catch {
+      setOwnGenderError("Could not save your gender. Try again.");
+    } finally {
+      setSavingOwnGender(false);
+    }
   }
 
   async function handleStart() {
@@ -117,11 +205,17 @@ export function AppFlow() {
     startLockRef.current = true;
 
     try {
-      const activePro = await refresh();
-      const preference = resolvedPreference(activePro);
+      const snapshot = await refresh();
+      const preference = resolvedPreference(snapshot.canUseSpecificGender);
 
       if (preference !== gender) {
         setGender("any");
+      }
+
+      if (preference !== "any" && !snapshot.ownGender) {
+        startLockRef.current = false;
+        handleNeedOwnGender(preference);
+        return;
       }
 
       setState("finding");
@@ -145,11 +239,17 @@ export function AppFlow() {
     startLockRef.current = true;
 
     try {
-      const activePro = await refresh();
-      const preference = resolvedPreference(activePro);
+      const snapshot = await refresh();
+      const preference = resolvedPreference(snapshot.canUseSpecificGender);
 
       if (preference !== gender) {
         setGender("any");
+      }
+
+      if (preference !== "any" && !snapshot.ownGender) {
+        startLockRef.current = false;
+        handleNeedOwnGender(preference);
+        return;
       }
 
       setState("finding");
@@ -181,18 +281,30 @@ export function AppFlow() {
             loading: proLoading,
           }}
           gender={
-            state === "landing"
+            state === "landing" || ownGenderPrompt !== "hidden"
               ? undefined
               : {
                   value: gender,
                   onChange: handleGenderChange,
                   isPro,
                   loading: proLoading,
+                  ownGenderSet: Boolean(ownGender),
+                  onNeedOwnGender: () => handleNeedOwnGender(),
                 }
           }
         />
 
-        {state === "landing" ? (
+        {ownGenderPrompt !== "hidden" ? (
+          <OwnGenderSetup
+            saving={savingOwnGender}
+            error={ownGenderError}
+            required={ownGenderPrompt === "required"}
+            onSave={handleSaveOwnGender}
+            onSkip={handleSkipOwnGender}
+          />
+        ) : null}
+
+        {ownGenderPrompt === "hidden" && state === "landing" ? (
           <LandingView
             mode={mode}
             onModeChange={setMode}
@@ -200,17 +312,18 @@ export function AppFlow() {
           />
         ) : null}
 
-        {state === "finding" ||
-        state === "connecting" ||
-        state === "disconnected" ||
-        state === "ended" ? (
+        {ownGenderPrompt === "hidden" &&
+        (state === "finding" ||
+          state === "connecting" ||
+          state === "disconnected" ||
+          state === "ended") ? (
           <StatusView
             state={state}
             onBackHome={handleCancelOrHome}
           />
         ) : null}
 
-        {state === "chat" ? (
+        {ownGenderPrompt === "hidden" && state === "chat" ? (
           <ChatView
             mode={mode}
             matchId={match?.matchId}

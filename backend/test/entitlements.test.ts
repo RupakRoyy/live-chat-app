@@ -5,7 +5,12 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { createProEntitlementService } from "../src/entitlements/service.js";
 import { createFileEntitlementStore } from "../src/entitlements/store.js";
-import type { EntitlementRecord, EntitlementStore } from "../src/entitlements/types.js";
+import {
+  parseOwnGender,
+  type EntitlementRecord,
+  type EntitlementStore,
+  type OwnGender,
+} from "../src/entitlements/types.js";
 
 function createMemoryStore(
   seed: Record<string, EntitlementRecord> = {},
@@ -23,6 +28,16 @@ function createMemoryStore(
       }
       records.set(record.userId, record);
       return record;
+    },
+    async updateOwnGender(userId, ownGender: OwnGender) {
+      const existing = records.get(userId);
+      if (!existing) {
+        return null;
+      }
+
+      const updated = { ...existing, ownGender };
+      records.set(userId, updated);
+      return updated;
     },
   };
 }
@@ -67,6 +82,7 @@ describe("Pro trial entitlements", () => {
     assert.equal(first.pro, true);
     assert.equal(first.trial, true);
     assert.equal(first.canUseSpecificGender, true);
+    assert.equal(first.authenticated ? first.ownGender : "missing", null);
     assert.equal(first.trialStartedAt, "2026-09-06T10:00:00.000Z");
     assert.equal(first.trialExpiresAt, "2026-09-07T10:00:00.000Z");
     assert.deepEqual(first, second);
@@ -121,6 +137,7 @@ describe("Pro trial entitlements", () => {
     assert.equal(expired.pro, false);
     assert.equal(expired.trial, false);
     assert.equal(expired.canUseSpecificGender, false);
+    assert.equal(expired.authenticated ? expired.ownGender : "missing", null);
     assert.equal(expired.trialExpiresAt, "2026-09-07T10:00:00.000Z");
     assert.equal(await service.resolveGenderPreference("user_clerk_1", "female"), "any");
     assert.equal(await service.resolveGenderPreference("user_clerk_1", "any"), "any");
@@ -164,8 +181,132 @@ describe("Pro trial entitlements", () => {
 
       assert.deepEqual(first, second);
       assert.equal(second.trialStartedAt, "2026-09-06T00:00:00.000Z");
+
+      const updated = await store.updateOwnGender("user_file", "female");
+      const stored = await store.getByUserId("user_file");
+      assert.equal(updated?.ownGender, "female");
+      assert.equal(stored?.ownGender, "female");
+      assert.equal(stored?.trialStartedAt, first.trialStartedAt);
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("saves own gender on the existing user record without resetting the trial", async () => {
+    const store = createMemoryStore();
+    const service = createProEntitlementService({
+      store,
+      getTrialDurationHours: () => 24,
+      now: () => new Date("2026-09-06T10:00:00.000Z"),
+    });
+
+    await service.getEntitlementSnapshot("user_clerk_1");
+    const saved = await service.setOwnGender("user_clerk_1", "male");
+    const again = await service.getEntitlementSnapshot("user_clerk_1");
+
+    assert.equal(saved.ownGender, "male");
+    assert.equal(again.authenticated ? again.ownGender : "missing", "male");
+    assert.equal(saved.trialStartedAt, "2026-09-06T10:00:00.000Z");
+    assert.equal(saved.trialExpiresAt, "2026-09-07T10:00:00.000Z");
+    assert.equal(await service.getOwnGender("user_clerk_1"), "male");
+  });
+
+  it("rejects invalid own-gender values and ignores a client-supplied userId", () => {
+    assert.equal(parseOwnGender("male"), "male");
+    assert.equal(parseOwnGender("female"), "female");
+    assert.equal(parseOwnGender("any"), null);
+    assert.equal(parseOwnGender("other"), null);
+    assert.equal(parseOwnGender(""), null);
+    assert.equal(parseOwnGender({ gender: "male", userId: "user_other" }), null);
+  });
+
+  it("allows Any Gender without own gender and blocks specific preference until it is set", async () => {
+    const store = createMemoryStore();
+    const service = createProEntitlementService({
+      store,
+      getTrialDurationHours: () => 24,
+      now: () => new Date("2026-09-06T10:00:00.000Z"),
+    });
+
+    const anyWithoutGender = await service.resolveMatchmakingJoin(
+      "user_clerk_1",
+      "any",
+    );
+    const specificWithoutGender = await service.resolveMatchmakingJoin(
+      "user_clerk_1",
+      "female",
+    );
+
+    assert.deepEqual(anyWithoutGender, {
+      ok: true,
+      userId: "user_clerk_1",
+      preference: "any",
+    });
+    assert.deepEqual(specificWithoutGender, {
+      ok: false,
+      code: "own_gender_required",
+      message: "Set your own gender before matching with a specific gender.",
+    });
+
+    await service.setOwnGender("user_clerk_1", "female");
+    const specificWithGender = await service.resolveMatchmakingJoin(
+      "user_clerk_1",
+      "male",
+    );
+    assert.deepEqual(specificWithGender, {
+      ok: true,
+      userId: "user_clerk_1",
+      preference: "male",
+      ownGender: "female",
+    });
+  });
+
+  it("downgrades anonymous and expired specific preferences without inventing own gender", async () => {
+    const store = createMemoryStore({
+      user_expired: {
+        userId: "user_expired",
+        trialStartedAt: "2026-09-01T00:00:00.000Z",
+        trialExpiresAt: "2026-09-02T00:00:00.000Z",
+        ownGender: "male",
+      },
+    });
+    const service = createProEntitlementService({
+      store,
+      getTrialDurationHours: () => 24,
+      now: () => new Date("2026-09-06T00:00:00.000Z"),
+    });
+
+    assert.deepEqual(await service.resolveMatchmakingJoin(undefined, "male"), {
+      ok: true,
+      preference: "any",
+    });
+    assert.deepEqual(await service.resolveMatchmakingJoin(null, "female"), {
+      ok: true,
+      preference: "any",
+    });
+    assert.deepEqual(await service.resolveMatchmakingJoin("user_expired", "female"), {
+      ok: true,
+      userId: "user_expired",
+      preference: "any",
+      ownGender: "male",
+    });
+  });
+
+  it("loads own gender from the store, never from a client-supplied value", async () => {
+    const store = createMemoryStore();
+    const service = createProEntitlementService({
+      store,
+      getTrialDurationHours: () => 24,
+      now: () => new Date("2026-09-06T10:00:00.000Z"),
+    });
+
+    await service.setOwnGender("user_real", "male");
+    const resolved = await service.resolveMatchmakingJoin("user_real", "any");
+
+    assert.equal(resolved.ok, true);
+    if (resolved.ok) {
+      assert.equal(resolved.ownGender, "male");
+      assert.equal(resolved.userId, "user_real");
     }
   });
 });

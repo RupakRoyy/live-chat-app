@@ -3,6 +3,8 @@
 import { getToken } from "@clerk/nextjs";
 import { publicEnv } from "./env";
 
+export type OwnGender = "male" | "female";
+
 export type AuthMeResponse = {
   authenticated: boolean;
   userId?: string;
@@ -11,6 +13,7 @@ export type AuthMeResponse = {
   trialStartedAt?: string;
   trialExpiresAt?: string;
   canUseSpecificGender: boolean;
+  ownGender?: OwnGender | null;
 };
 
 export const ANONYMOUS_AUTH_ME: AuthMeResponse = {
@@ -75,6 +78,10 @@ export function parseAuthMe(data: unknown): AuthMeResponse {
       trialExpiresAt:
         typeof payload.trialExpiresAt === "string" ? payload.trialExpiresAt : "",
       canUseSpecificGender: payload.canUseSpecificGender === true,
+      ownGender:
+        payload.ownGender === "male" || payload.ownGender === "female"
+          ? payload.ownGender
+          : null,
     };
   }
 
@@ -86,6 +93,24 @@ export async function fetchAuthMe(): Promise<AuthMeResponse> {
 
   if (!response.ok) {
     throw new Error("Failed to load account");
+  }
+
+  return parseAuthMe(await response.json());
+}
+
+export async function updateOwnGender(
+  gender: OwnGender,
+): Promise<AuthMeResponse> {
+  const response = await apiRequest("/profile", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ gender }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to save gender");
   }
 
   return parseAuthMe(await response.json());

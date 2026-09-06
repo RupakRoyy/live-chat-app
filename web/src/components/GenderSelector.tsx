@@ -57,6 +57,8 @@ type GenderSelectorProps = {
   onChange: (value: GenderPreference) => void;
   isPro: boolean;
   loading?: boolean;
+  ownGenderSet?: boolean;
+  onNeedOwnGender?: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -66,6 +68,8 @@ export function GenderSelector({
   onChange,
   isPro,
   loading = false,
+  ownGenderSet = true,
+  onNeedOwnGender,
   open,
   onOpenChange,
 }: GenderSelectorProps) {
@@ -81,6 +85,12 @@ export function GenderSelector({
 
   function handleSelect(next: GenderPreference) {
     if (!canSelectGenderPreference(next, isPro)) {
+      return;
+    }
+
+    if (next !== "any" && !ownGenderSet) {
+      onNeedOwnGender?.();
+      onOpenChange(false);
       return;
     }
 
@@ -126,7 +136,7 @@ export function GenderSelector({
       {open && !loading && isPro ? (
         <div className="panel-card absolute right-0 top-14 z-30 w-52 overflow-hidden rounded-2xl">
           <p className="border-b border-border-strong px-4 py-3 text-xs font-medium text-charcoal/60">
-            Gender
+            {ownGenderSet ? "Gender" : "Set your gender first"}
           </p>
           {genders.map((item) => {
             const selected = item === value;

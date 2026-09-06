@@ -1,7 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { EntitlementRecord, EntitlementStore } from "./types.js";
+import {
+  isOwnGender,
+  type EntitlementRecord,
+  type EntitlementStore,
+  type OwnGender,
+} from "./types.js";
 
 const backendRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -11,6 +16,17 @@ const backendRoot = path.resolve(
 const defaultFilePath = path.join(backendRoot, "data", "entitlements.json");
 
 type EntitlementMap = Record<string, EntitlementRecord>;
+
+function normalizeRecord(value: EntitlementRecord): EntitlementRecord {
+  const ownGender = isOwnGender(value.ownGender) ? value.ownGender : undefined;
+
+  return {
+    userId: value.userId,
+    trialStartedAt: value.trialStartedAt,
+    trialExpiresAt: value.trialExpiresAt,
+    ...(ownGender ? { ownGender } : {}),
+  };
+}
 
 function isRecord(value: unknown): value is EntitlementRecord {
   if (!value || typeof value !== "object") {
@@ -53,7 +69,7 @@ export function createFileEntitlementStore(
       const records: EntitlementMap = {};
       for (const [userId, value] of Object.entries(parsed)) {
         if (isRecord(value)) {
-          records[userId] = value;
+          records[userId] = normalizeRecord(value);
         }
       }
       return records;
@@ -87,9 +103,28 @@ export function createFileEntitlementStore(
           return existing;
         }
 
-        records[record.userId] = record;
+        const stored = normalizeRecord(record);
+        records[record.userId] = stored;
         await writeAll(records);
-        return record;
+        return stored;
+      });
+    },
+
+    updateOwnGender(userId: string, ownGender: OwnGender) {
+      return enqueue(async () => {
+        const records = await readAll();
+        const existing = records[userId];
+        if (!existing) {
+          return null;
+        }
+
+        const updated = normalizeRecord({
+          ...existing,
+          ownGender,
+        });
+        records[userId] = updated;
+        await writeAll(records);
+        return updated;
       });
     },
   };

@@ -21,7 +21,14 @@ export function AppFlow() {
   const [state, setState] = useState<AppState>("landing");
   const [mode, setMode] = useState<ChatMode>("video");
   const [gender, setGender] = useState<GenderPreference>("any");
-  const { isPro, loading: proLoading, refresh } = useProStatus();
+  const {
+    authenticated,
+    isPro,
+    trial,
+    trialExpiresAt,
+    loading: proLoading,
+    refresh,
+  } = useProStatus();
   const { match, socket, socketId, join, cancel, leave } = useMatchmaking();
   const startLockRef = useRef(false);
 
@@ -118,7 +125,7 @@ export function AppFlow() {
       }
 
       setState("finding");
-      join({
+      await join({
         mode,
         preference,
       });
@@ -133,14 +140,26 @@ export function AppFlow() {
     setState("landing");
   }
 
-  function handleNext() {
+  async function handleNext() {
     leave();
     startLockRef.current = true;
-    setState("finding");
-    join({
-      mode,
-      preference: resolvedPreference(),
-    });
+
+    try {
+      const activePro = await refresh();
+      const preference = resolvedPreference(activePro);
+
+      if (preference !== gender) {
+        setGender("any");
+      }
+
+      setState("finding");
+      await join({
+        mode,
+        preference,
+      });
+    } catch {
+      startLockRef.current = false;
+    }
   }
 
   function handleEnd() {
@@ -155,6 +174,12 @@ export function AppFlow() {
 
       <div className="relative z-10 flex min-h-dvh flex-1 flex-col">
         <AppHeader
+          entitlement={{
+            authenticated,
+            trial,
+            trialExpiresAt,
+            loading: proLoading,
+          }}
           gender={
             state === "landing"
               ? undefined

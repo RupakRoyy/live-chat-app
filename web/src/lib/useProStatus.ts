@@ -2,62 +2,99 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useEffect, useState } from "react";
-import { fetchProStatus } from "./api";
+import { ANONYMOUS_AUTH_ME, fetchAuthMe, type AuthMeResponse } from "./api";
+
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export function useProStatus() {
   const { isLoaded, isSignedIn } = useAuth();
-  const [isPro, setIsPro] = useState(false);
+  const [entitlement, setEntitlement] = useState<AuthMeResponse>(ANONYMOUS_AUTH_ME);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!isSignedIn) {
-      setIsPro(false);
-      return false;
-    }
-
     try {
-      const status = await fetchProStatus();
-      setIsPro(status.isPro);
-      return status.isPro;
+      const status = await fetchAuthMe();
+      setEntitlement(status);
+      return status.canUseSpecificGender;
     } catch {
-      setIsPro(false);
+      setEntitlement(ANONYMOUS_AUTH_ME);
       return false;
     }
-  }, [isSignedIn]);
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) {
       return;
     }
 
-    if (!isSignedIn) {
-      setIsPro(false);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
 
-    void refresh()
-      .catch(() => {
-        if (!cancelled) {
-          setIsPro(false);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+    void refresh().finally(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    });
 
     return () => {
       cancelled = true;
     };
   }, [isLoaded, isSignedIn, refresh]);
 
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible" && isLoaded) {
+        void refresh();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isLoaded, refresh]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isLoaded, refresh]);
+
+  useEffect(() => {
+    if (!entitlement.trial || !entitlement.trialExpiresAt) {
+      return;
+    }
+
+    const expiresAt = Date.parse(entitlement.trialExpiresAt);
+    if (!Number.isFinite(expiresAt)) {
+      return;
+    }
+
+    const delay = Math.max(0, expiresAt - Date.now()) + 500;
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, delay);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [entitlement.trial, entitlement.trialExpiresAt, refresh]);
+
   return {
-    isPro,
+    authenticated: entitlement.authenticated,
+    userId: entitlement.userId ?? null,
+    isPro: entitlement.pro,
+    trial: entitlement.trial,
+    trialExpiresAt: entitlement.trialExpiresAt ?? null,
+    canUseSpecificGender: entitlement.canUseSpecificGender,
     loading: !isLoaded || loading,
     refresh,
   };

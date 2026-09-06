@@ -1,5 +1,6 @@
 "use client";
 
+import { getToken } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createMatchmakingSocket,
@@ -62,7 +63,7 @@ export function useMatchmaking() {
   }, [disposeSocket, reset]);
 
   const join = useCallback(
-    (input: MatchmakingJoinInput) => {
+    async (input: MatchmakingJoinInput) => {
       if (joinLockRef.current) {
         return;
       }
@@ -74,7 +75,7 @@ export function useMatchmaking() {
 
       disposeSocket();
 
-      const nextSocket = createMatchmakingSocket();
+      const nextSocket = createMatchmakingSocket(() => getToken());
       socketRef.current = nextSocket;
       setSocket(nextSocket);
 

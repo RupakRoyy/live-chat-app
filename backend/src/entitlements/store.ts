@@ -26,7 +26,7 @@ function isRecord(value: unknown): value is EntitlementRecord {
 }
 
 /**
- * JSON-file entitlement store. Replace this module with a Supabase adapter later.
+ * JSON-file entitlement store used when Supabase credentials are not configured.
  */
 export function createFileEntitlementStore(
   filePath = defaultFilePath,

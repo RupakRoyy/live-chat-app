@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "tsx --test test/entitlements.test.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.17.1",
+    "@supabase/supabase-js": "^2.115.0",
     "@upstash/redis": "^1.38.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

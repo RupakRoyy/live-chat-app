@@ -1,4 +1,6 @@
 import type { Server, Socket } from "socket.io";
+import { resolveGenderPreference } from "../entitlements/index.js";
+import { getSocketUserId } from "../socket/auth.js";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -107,7 +109,14 @@ export function registerMatchmakingHandlers(
     }
 
     try {
-      const result = await joinForConnectedSocket(io, socket, parsed);
+      const preference = await resolveGenderPreference(
+        getSocketUserId(socket),
+        parsed.preference,
+      );
+      const result = await joinForConnectedSocket(io, socket, {
+        ...parsed,
+        preference,
+      });
       if (!result) {
         return;
       }

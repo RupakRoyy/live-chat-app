@@ -4,6 +4,7 @@ import { registerMatchmakingHandlers } from "../matchmaking/handlers.js";
 import { registerMessagingHandlers } from "../messaging/handlers.js";
 import { registerSignalingHandlers } from "../signaling/handlers.js";
 import { env } from "../config/env.js";
+import { attachSocketIdentity } from "./auth.js";
 import type { ClientToServerEvents, ServerToClientEvents } from "./events.js";
 
 export function createSocketServer(httpServer: HttpServer) {
@@ -12,6 +13,10 @@ export function createSocketServer(httpServer: HttpServer) {
       origin: env.frontendUrl,
       methods: ["GET", "POST"],
     },
+  });
+
+  io.use((socket, next) => {
+    void attachSocketIdentity(socket, next);
   });
 
   io.on("connection", (socket) => {

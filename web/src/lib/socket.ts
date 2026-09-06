@@ -178,7 +178,9 @@ export function toJoinPayload(input: {
   return payload;
 }
 
-export function createMatchmakingSocket(): MatchmakingSocket {
+export function createMatchmakingSocket(
+  getAccessToken?: () => Promise<string | null>,
+): MatchmakingSocket {
   if (typeof window === "undefined") {
     throw new Error("Matchmaking socket can only be created in the browser");
   }
@@ -186,5 +188,19 @@ export function createMatchmakingSocket(): MatchmakingSocket {
   return io(getSocketUrl(), {
     autoConnect: false,
     reconnection: true,
+    auth: (callback: (data: Record<string, string>) => void) => {
+      if (!getAccessToken) {
+        callback({});
+        return;
+      }
+
+      void getAccessToken()
+        .then((token) => {
+          callback(token ? { token } : {});
+        })
+        .catch(() => {
+          callback({});
+        });
+    },
   });
 }

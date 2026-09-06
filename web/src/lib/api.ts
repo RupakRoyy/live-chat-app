@@ -4,7 +4,20 @@ import { getToken } from "@clerk/nextjs";
 import { publicEnv } from "./env";
 
 export type AuthMeResponse = {
-  userId: string;
+  authenticated: boolean;
+  userId?: string;
+  pro: boolean;
+  trial: boolean;
+  trialStartedAt?: string;
+  trialExpiresAt?: string;
+  canUseSpecificGender: boolean;
+};
+
+export const ANONYMOUS_AUTH_ME: AuthMeResponse = {
+  authenticated: false,
+  pro: false,
+  trial: false,
+  canUseSpecificGender: false,
 };
 
 export type ProStatusResponse = {
@@ -40,20 +53,42 @@ export async function apiRequest(
   });
 }
 
+export function parseAuthMe(data: unknown): AuthMeResponse {
+  if (!data || typeof data !== "object") {
+    throw new Error("Failed to load account");
+  }
+
+  const payload = data as Partial<AuthMeResponse>;
+
+  if (payload.authenticated === true) {
+    if (typeof payload.userId !== "string" || !payload.userId) {
+      throw new Error("Failed to load authenticated user");
+    }
+
+    return {
+      authenticated: true,
+      userId: payload.userId,
+      pro: payload.pro === true,
+      trial: payload.trial === true,
+      trialStartedAt:
+        typeof payload.trialStartedAt === "string" ? payload.trialStartedAt : "",
+      trialExpiresAt:
+        typeof payload.trialExpiresAt === "string" ? payload.trialExpiresAt : "",
+      canUseSpecificGender: payload.canUseSpecificGender === true,
+    };
+  }
+
+  return ANONYMOUS_AUTH_ME;
+}
+
 export async function fetchAuthMe(): Promise<AuthMeResponse> {
   const response = await apiRequest("/auth/me");
 
   if (!response.ok) {
-    throw new Error("Failed to load authenticated user");
+    throw new Error("Failed to load account");
   }
 
-  const data = (await response.json()) as AuthMeResponse;
-
-  if (typeof data.userId !== "string" || !data.userId) {
-    throw new Error("Failed to load authenticated user");
-  }
-
-  return data;
+  return parseAuthMe(await response.json());
 }
 
 export async function fetchProStatus(): Promise<ProStatusResponse> {

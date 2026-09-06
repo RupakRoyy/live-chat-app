@@ -5,8 +5,9 @@ import { useEffect } from "react";
 import { fetchAuthMe } from "./api";
 
 /**
- * Calls GET /auth/me with the Clerk session token.
- * Renders nothing so existing UI stays unchanged.
+ * Calls GET /auth/me after Clerk loads.
+ * Anonymous users receive authenticated:false. Signed-in users establish
+ * backend identity and a one-time Pro trial. Renders nothing.
  */
 export function AuthMeTest() {
   const { isLoaded } = useAuth();
@@ -15,7 +16,7 @@ export function AuthMeTest() {
     if (!isLoaded) return;
 
     void fetchAuthMe().catch(() => {
-      // Signed-out users (or a missing token) cannot load /auth/me.
+      // Ignore transport errors; UI entitlement refresh is handled separately.
     });
   }, [isLoaded]);
 
